@@ -83,13 +83,12 @@ func Write(w io.Writer, annots ...*Annot) error {
 	for _, a := range annots {
 		if len(a.Lines) == 0 {
 			a.lines = append(a.lines, &line{})
-			break
+			continue
 		}
 		a.lines = make([]*line, len(a.Lines))
 		for i := range a.Lines {
 			a.lines[i] = &line{
-				//             3 for "└─ " or "   " (indentation)
-				length:        3 + utf8.RuneCountInString(a.Lines[i]),
+				length:        utf8.RuneCountInString(a.Lines[i]),
 				leadingSpaces: a.Col,
 			}
 		}
@@ -153,7 +152,8 @@ func checkLineAndSetSpace(row, aLineIdx int, a *Annot, rightAnnots []*Annot) boo
 		return true
 	}
 
-	lineLength := a.lines[aLineIdx].length
+	//            3 for "└─ " or "   " (indentation)
+	lineLength := 3 + a.lines[aLineIdx].length
 
 	remainingSpaces := closestA.Col - a.Col - lineLength
 

@@ -24,6 +24,20 @@ func TestWrite(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "two empty annotations",
+			annots: []*Annot{
+				{Col: 0},
+				{Col: 2},
+			},
+			wantW: `
+↑ ↑
+│ └─ 
+│
+└─ 
+`,
+			wantErr: false,
+		},
+		{
 			name: "annotation without a column",
 			annots: []*Annot{
 				{Lines: []string{"line1"}},
