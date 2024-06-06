@@ -86,6 +86,19 @@ func TestWrite(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "utf8, japanese characters and emojis",
+			annots: []*Annot{
+				{Col: 0, Lines: []string{"⭐️漢", "æñ🥏Ǌ"}},
+				{Col: 10, Lines: []string{"æñŶǼǊ", "字ñŶǼǊ"}},
+			},
+			wantW: `
+↑         ↑
+└─ ⭐️漢   └─ æñŶǼǊ
+   æñ🥏Ǌ     字ñŶǼǊ
+`,
+			wantErr: false,
+		},
+		{
 			name: "next to each other with enough distance and second annotation has more lines",
 			annots: []*Annot{
 				{Col: 5, Lines: []string{"line1", "line2"}},

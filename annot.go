@@ -5,7 +5,8 @@ import (
 	"io"
 	"slices"
 	"strings"
-	"unicode/utf8"
+
+	"github.com/rivo/uniseg"
 )
 
 // Annot annotates information with a text (represented in Lines)
@@ -88,7 +89,7 @@ func Write(w io.Writer, annots ...*Annot) error {
 		a.lines = make([]*line, len(a.Lines))
 		for i := range a.Lines {
 			a.lines[i] = &line{
-				length:        utf8.RuneCountInString(a.Lines[i]),
+				length:        uniseg.StringWidth(a.Lines[i]),
 				leadingSpaces: a.Col,
 			}
 		}
