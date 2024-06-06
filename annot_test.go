@@ -186,7 +186,7 @@ func TestWrite(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "correct vertical and horizontal distance 2",
+			name: "correct horizontal distance",
 			annots: []*Annot{
 				{Col: 0, Lines: []string{"line1", "line2"}},
 				{Col: 10, Lines: []string{"line1", "line2"}},
