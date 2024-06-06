@@ -37,11 +37,11 @@ type section int
 // -   | not relevant            |     ↑
 // 0 · | above · · · · · · · · · | · ██│· · · · · · · · · · · · · · · · · · · · · ·
 // 1   | above                   |   ██│
-// 2 · | linesFirstTwo · · · · · | · ██└─ line1 · · · · row position of annotation
-// 3   | linesFirstTwo           |   █████line2
+// 2 · | lineOne · · · · · · · · | · ██└─ line1 · · · · row position of annotation
+// 3   | lineTwo                 |    ████line2
 // 4 · | linesAfterSecond· · · · | ·  · ██line3 · · · · · · · · · · · · · · · · · ·
 // 5   | linesAfterSecond        |      ██line4
-// 6 · | trailingSpaceLines(1) · | ·  · ███████ · · · · · · · · · · · · · · · · · ·
+// 6 · | trailingSpaceLines(1) · | ·  · ·█· · · · · · · · · · · · · · · · · · · · ·
 // 7   | noAnnot                 |
 // 8 · | noAnnot · · · · · · · · | ·  · · · · · · · · · · · · · · · · · · · · · · ·
 // 9   | noAnnot                 |
@@ -49,11 +49,38 @@ type section int
 // #   |                         |    █ = needed space.
 const (
 	above section = iota
-	linesFirstTwo
+	lineOne
+	lineTwo
 	linesAfterSecond
 	trailingSpaceLines
 	noAnnot
 )
+
+func (s *section) space() int {
+	switch *s {
+	case above, lineOne:
+		return 2
+	case lineTwo:
+		return 4
+	case linesAfterSecond:
+		return 2
+	case trailingSpaceLines:
+		return 1
+	default:
+		return -1
+	}
+}
+
+func (s *section) colPosShift() int {
+	switch *s {
+	case above, lineOne:
+		return 0
+	case lineTwo, linesAfterSecond, trailingSpaceLines:
+		return 3
+	default:
+		return -1
+	}
+}
 
 // AppendLines adds initial or appends additional lines to an annotation.
 func (a *Annot) AppendLines(lines ...string) {
@@ -88,9 +115,14 @@ func Write(w io.Writer, annots ...*Annot) error {
 		}
 		a.lines = make([]*line, len(a.Lines))
 		for i := range a.Lines {
+			leadingSpaces := a.Col
+			if i > 0 {
+				leadingSpaces += 3
+			}
+
 			a.lines[i] = &line{
 				length:        uniseg.StringWidth(a.Lines[i]),
-				leadingSpaces: a.Col,
+				leadingSpaces: leadingSpaces,
 			}
 		}
 		a.pipeLeadingSpaces = make([]int, 0)
@@ -124,12 +156,12 @@ func setRow(a *Annot, rightAnnots []*Annot) {
 }
 
 func setSpace(rowBefore int, a *Annot, rightAnnots []*Annot) {
-	rightA, s := closestAnnot(rowBefore, rightAnnots, 0)
+	closestA, s := closestAnnot(rowBefore, rightAnnots, 0)
 	switch s {
 	case above:
-		rightA.pipeLeadingSpaces[rowBefore] = rightA.Col - a.Col - 1
-	case linesFirstTwo, linesAfterSecond:
-		rightA.lines[rowBefore-rightA.row].leadingSpaces = rightA.Col - a.Col - 1
+		closestA.pipeLeadingSpaces[rowBefore] = closestA.Col + s.colPosShift() - a.Col - 1
+	case lineOne, lineTwo, linesAfterSecond:
+		closestA.lines[rowBefore-closestA.row].leadingSpaces = closestA.Col + s.colPosShift() - a.Col - 1
 	case noAnnot, trailingSpaceLines:
 		// Do nothing
 	}
@@ -156,19 +188,9 @@ func checkLineAndSetSpace(row, aLineIdx int, a *Annot, rightAnnots []*Annot) boo
 	//            3 for "└─ " or "   " (indentation)
 	lineLength := 3 + a.lines[aLineIdx].length
 
-	remainingSpaces := closestA.Col - a.Col - lineLength
+	remainingSpaces := closestA.Col + s.colPosShift() - a.Col - lineLength
 
-	//                  |     ↑
-	// above            |   ██│
-	// above            |   ██│
-	// linesFirstTwo    |   ██└─ line1
-	// linesFirstTwo    |   ██   line2
-	// linesAfterSecond |        line3
-	//
-	// █ = needed space
-	tooLongForAboveOrLinesFirstTwo := (s == above || s == linesFirstTwo) && remainingSpaces < 2
-
-	if remainingSpaces < 0 || tooLongForAboveOrLinesFirstTwo {
+	if remainingSpaces-s.space() < 0 {
 		a.row++
 		a.pipeLeadingSpaces = append(a.pipeLeadingSpaces, a.Col)
 		return false
@@ -177,18 +199,19 @@ func checkLineAndSetSpace(row, aLineIdx int, a *Annot, rightAnnots []*Annot) boo
 	switch s {
 	case above:
 		closestA.pipeLeadingSpaces[rowPlusLineIdx] = remainingSpaces
-	case linesFirstTwo, linesAfterSecond:
+	case lineOne, lineTwo, linesAfterSecond:
 		closestA.lines[rowPlusLineIdx-closestA.row].leadingSpaces = remainingSpaces
 	case trailingSpaceLines:
 		closestA2, s2 := closestAnnot(rowPlusLineIdx, rightAnnots, 0)
 		if s2 == noAnnot {
 			return true
 		}
+		leadingSpaces2 := closestA2.Col + s2.colPosShift() - a.Col - lineLength
 		if s2 == above {
-			closestA2.pipeLeadingSpaces[rowPlusLineIdx] = closestA2.Col - a.Col - lineLength
+			closestA2.pipeLeadingSpaces[rowPlusLineIdx] = leadingSpaces2
 			break
 		}
-		closestA2.lines[rowPlusLineIdx-closestA2.row].leadingSpaces = closestA2.Col - a.Col - lineLength
+		closestA2.lines[rowPlusLineIdx-closestA2.row].leadingSpaces = leadingSpaces2
 	default:
 		panic("should never be reached")
 	}
@@ -200,8 +223,11 @@ func closestAnnot(row int, rightAnnots []*Annot, trailingVerticalSpaceLinesCount
 		if row < a.row {
 			return a, above
 		}
-		if a.row <= row && row < a.row+len(a.lines) && row < 2 {
-			return a, linesFirstTwo
+		if a.row == row {
+			return a, lineOne
+		}
+		if a.row+1 == row && row < a.row+len(a.lines) {
+			return a, lineTwo
 		}
 		if 2 <= row && row < a.row+len(a.lines) {
 			return a, linesAfterSecond
@@ -249,7 +275,6 @@ func write(writer io.Writer, annots []*Annot) error {
 				}
 			case row < a.row+len(a.lines):
 				b.WriteString(strings.Repeat(" ", a.lines[row-a.row].leadingSpaces))
-				b.WriteString("   ")
 				b.WriteString(a.Lines[row-a.row])
 			}
 		}

@@ -13,6 +13,26 @@ func TestWrite(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "utilise every space to the limit",
+			annots: []*Annot{
+				{Col: 0, Lines: []string{"000", "100", "2000", "300000", "400000", "5000000", "6000000000000"}},
+				{Col: 8, Lines: []string{"line1", "line2", "line3", "line4"}},
+				{Col: 9, Lines: []string{"line1"}},
+			},
+			wantW: `
+↑       ↑↑
+│       │└─ line1
+└─ 000  │
+   100  └─ line1
+   2000    line2
+   300000  line3
+   400000  line4
+   5000000
+   6000000000000
+`,
+			wantErr: false,
+		},
+		{
 			name: "empty annotation",
 			annots: []*Annot{
 				{},
@@ -27,12 +47,11 @@ func TestWrite(t *testing.T) {
 			name: "two empty annotations",
 			annots: []*Annot{
 				{Col: 0},
-				{Col: 2},
+				{Col: 1},
 			},
 			wantW: `
-↑ ↑
-│ └─ 
-│
+↑↑
+│└─ 
 └─ 
 `,
 			wantErr: false,
@@ -208,6 +227,36 @@ func TestWrite(t *testing.T) {
 ↑         ↑
 └─ line1  └─ line1
    line2     line2
+`,
+			wantErr: false,
+		},
+		{
+			name: "allow one space more at the edge",
+			annots: []*Annot{
+				{Col: 0, Lines: []string{"line1", "line2"}},
+				{Col: 6, Lines: []string{"line1", "line2"}},
+			},
+			wantW: `
+↑     ↑
+│     └─ line1
+│        line2
+└─ line1
+   line2
+`,
+			wantErr: false,
+		},
+		{
+			name: "allow one space more at lines after the second line",
+			annots: []*Annot{
+				{Col: 0, Lines: []string{"line1", "line2"}},
+				{Col: 7, Lines: []string{"line1", "line2", "line3", "line4"}},
+			},
+			wantW: `
+↑      ↑
+│      └─ line1
+│         line2
+└─ line1  line3
+   line2  line4
 `,
 			wantErr: false,
 		},
