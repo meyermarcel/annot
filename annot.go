@@ -166,11 +166,9 @@ func checkLineAndSetSpace(row, aLineIdx int, a *Annot, rightAnnots []*Annot) boo
 	// linesAfterSecond |        line3
 	//
 	// █ = needed space
-	if s == above || s == linesFirstTwo {
-		remainingSpaces -= 2
-	}
+	tooLongForAboveOrLinesFirstTwo := (s == above || s == linesFirstTwo) && remainingSpaces < 2
 
-	if remainingSpaces < 0 {
+	if remainingSpaces < 0 || tooLongForAboveOrLinesFirstTwo {
 		a.row++
 		a.pipeLeadingSpaces = append(a.pipeLeadingSpaces, a.Col)
 		return false
@@ -178,10 +176,8 @@ func checkLineAndSetSpace(row, aLineIdx int, a *Annot, rightAnnots []*Annot) boo
 
 	switch s {
 	case above:
-		closestA.pipeLeadingSpaces[rowPlusLineIdx] = remainingSpaces + 2
-	case linesFirstTwo:
-		closestA.lines[rowPlusLineIdx-closestA.row].leadingSpaces = remainingSpaces + 2
-	case linesAfterSecond:
+		closestA.pipeLeadingSpaces[rowPlusLineIdx] = remainingSpaces
+	case linesFirstTwo, linesAfterSecond:
 		closestA.lines[rowPlusLineIdx-closestA.row].leadingSpaces = remainingSpaces
 	case trailingSpaceLines:
 		closestA2, s2 := closestAnnot(rowPlusLineIdx, rightAnnots, 0)
