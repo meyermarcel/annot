@@ -110,7 +110,8 @@ func Write(w io.Writer, annots ...*Annot) error {
 
 	for _, a := range annots {
 		if len(a.Lines) == 0 {
-			a.lines = append(a.lines, &line{})
+			a.lines = make([]*line, 1)
+			a.lines[0] = &line{}
 			continue
 		}
 		a.lines = make([]*line, len(a.Lines))
