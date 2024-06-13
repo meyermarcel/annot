@@ -125,7 +125,6 @@ func Write(w io.Writer, annots ...*Annot) error {
 				leadingSpaces: leadingSpaces,
 			}
 		}
-		a.pipeLeadingSpaces = make([]int, 0)
 	}
 
 	// Start with second last annotation index and decrement.
