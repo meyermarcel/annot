@@ -24,6 +24,7 @@ type Annot struct {
 	pipeLeadingSpaces []int
 }
 
+// line is an internal parallel to a string in Lines.
 type line struct {
 	length        int
 	leadingSpaces int
@@ -109,23 +110,7 @@ func Write(w io.Writer, annots ...*Annot) error {
 	})
 
 	for _, a := range annots {
-		if len(a.Lines) == 0 {
-			a.lines = make([]*line, 1)
-			a.lines[0] = &line{}
-			continue
-		}
-		a.lines = make([]*line, len(a.Lines))
-		for i := range a.Lines {
-			leadingSpaces := a.Col
-			if i > 0 {
-				leadingSpaces += 3
-			}
-
-			a.lines[i] = &line{
-				length:        uniseg.StringWidth(a.Lines[i]),
-				leadingSpaces: leadingSpaces,
-			}
-		}
+		a.createLines()
 	}
 
 	// Start with second last annotation index and decrement.
@@ -136,6 +121,28 @@ func Write(w io.Writer, annots ...*Annot) error {
 	}
 
 	return write(w, annots)
+}
+
+// createLines creates an array of lines parallel to Lines.
+func (a *Annot) createLines() {
+	if len(a.Lines) == 0 {
+		a.lines = make([]*line, 1)
+		a.lines[0] = &line{}
+		return
+	}
+
+	a.lines = make([]*line, len(a.Lines))
+	for i := range a.Lines {
+		leadingSpaces := a.Col
+		if i > 0 {
+			leadingSpaces += 3
+		}
+
+		a.lines[i] = &line{
+			length:        uniseg.StringWidth(a.Lines[i]),
+			leadingSpaces: leadingSpaces,
+		}
+	}
 }
 
 func setRow(a *Annot, rightAnnots []*Annot) {
