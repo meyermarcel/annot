@@ -16,8 +16,14 @@ type Annot struct {
 	// E.g. 0 draws an arrow to the first character in a line.
 	Col int
 
+	// ColEnd needs to be higher than Col. If ColEnd is set a
+	// range is annotated.
+	ColEnd int
+
 	// Lines is the text of the annotation represented in one or more lines.
 	Lines []string
+
+	pipeColIdx int
 
 	row               int
 	lines             []*line
@@ -109,7 +115,18 @@ func Write(w io.Writer, annots ...*Annot) error {
 		return a.Col - b.Col
 	})
 
-	for _, a := range annots {
+	for aIdx, a := range annots {
+		if a.ColEnd != 0 {
+			if a.Col >= a.ColEnd {
+				return newColExceedsColEndError(aIdx+1, a.Col, a.ColEnd)
+			}
+			a.pipeColIdx = (a.Col + a.ColEnd) / 2
+		} else {
+			a.pipeColIdx = a.Col
+		}
+		if aIdx > 0 && annots[aIdx-1].ColEnd != 0 && annots[aIdx-1].ColEnd >= a.Col {
+			return newOverlapError(annots[aIdx-1].ColEnd, aIdx, a.Col)
+		}
 		a.createLines()
 	}
 
@@ -127,13 +144,13 @@ func Write(w io.Writer, annots ...*Annot) error {
 func (a *Annot) createLines() {
 	if len(a.Lines) == 0 {
 		a.lines = make([]*line, 1)
-		a.lines[0] = &line{}
+		a.lines[0] = &line{leadingSpaces: a.pipeColIdx}
 		return
 	}
 
 	a.lines = make([]*line, len(a.Lines))
 	for i := range a.Lines {
-		leadingSpaces := a.Col
+		leadingSpaces := a.pipeColIdx
 		if i > 0 {
 			leadingSpaces += 3
 		}
@@ -166,9 +183,9 @@ func setSpace(rowBefore int, a *Annot, rightAnnots []*Annot) {
 	closestA, s := closestAnnot(rowBefore, rightAnnots, 0)
 	switch s {
 	case above:
-		closestA.pipeLeadingSpaces[rowBefore] = closestA.Col + s.colPosShift() - a.Col - 1
+		closestA.pipeLeadingSpaces[rowBefore] = closestA.pipeColIdx + s.colPosShift() - a.pipeColIdx - 1
 	case lineOne, lineTwo, linesAfterSecond:
-		closestA.lines[rowBefore-closestA.row].leadingSpaces = closestA.Col + s.colPosShift() - a.Col - 1
+		closestA.lines[rowBefore-closestA.row].leadingSpaces = closestA.pipeColIdx + s.colPosShift() - a.pipeColIdx - 1
 	case noAnnot, trailingSpaceLines:
 		// Do nothing
 	}
@@ -195,11 +212,11 @@ func checkLineAndSetSpace(row, aLineIdx int, a *Annot, rightAnnots []*Annot) boo
 	//            3 for "└─ " or "   " (indentation)
 	lineLength := 3 + a.lines[aLineIdx].length
 
-	remainingSpaces := closestA.Col + s.colPosShift() - a.Col - lineLength
+	remainingSpaces := closestA.pipeColIdx + s.colPosShift() - a.pipeColIdx - lineLength
 
 	if remainingSpaces-s.space() < 0 {
 		a.row++
-		a.pipeLeadingSpaces = append(a.pipeLeadingSpaces, a.Col)
+		a.pipeLeadingSpaces = append(a.pipeLeadingSpaces, a.pipeColIdx)
 		return false
 	}
 
@@ -213,7 +230,7 @@ func checkLineAndSetSpace(row, aLineIdx int, a *Annot, rightAnnots []*Annot) boo
 		if s2 == noAnnot {
 			return true
 		}
-		leadingSpaces2 := closestA2.Col + s2.colPosShift() - a.Col - lineLength
+		leadingSpaces2 := closestA2.pipeColIdx + s2.colPosShift() - a.pipeColIdx - lineLength
 		if s2 == above {
 			closestA2.pipeLeadingSpaces[rowPlusLineIdx] = leadingSpaces2
 			break
@@ -248,19 +265,15 @@ func closestAnnot(row int, rightAnnots []*Annot, trailingVerticalSpaceLinesCount
 }
 
 func write(writer io.Writer, annots []*Annot) error {
-	lastColPos := 0
 	rowCount := 0
+	for _, a := range annots {
+		rowCount = max(rowCount, a.row+len(a.lines))
+	}
 
 	b := &strings.Builder{}
 
-	for _, a := range annots {
-		b.WriteString(strings.Repeat(" ", a.Col-lastColPos))
-		b.WriteString("↑")
-		lastColPos = a.Col + 1
+	b.WriteString(arrowOrRangeString(annots))
 
-		// Also use this loop to calculate rowCount
-		rowCount = max(rowCount, a.row+len(a.lines))
-	}
 	b.WriteString("\n")
 	_, err := fmt.Fprint(writer, b.String())
 	if err != nil {
@@ -294,4 +307,32 @@ func write(writer io.Writer, annots []*Annot) error {
 	}
 
 	return nil
+}
+
+func arrowOrRangeString(annots []*Annot) string {
+	widthWritten := 0
+
+	b := &strings.Builder{}
+
+	for _, a := range annots {
+		if a.ColEnd == 0 {
+			b.WriteString(strings.Repeat(" ", a.pipeColIdx-widthWritten))
+			b.WriteString("↑")
+			widthWritten = a.pipeColIdx + 1
+			continue
+		}
+
+		b.WriteString(strings.Repeat(" ", a.Col-widthWritten))
+		if a.Col == a.pipeColIdx {
+			b.WriteString("├")
+		} else {
+			b.WriteString("└")
+			b.WriteString(strings.Repeat("─", a.pipeColIdx-a.Col-1))
+			b.WriteString("┬")
+		}
+		b.WriteString(strings.Repeat("─", a.ColEnd-a.pipeColIdx-1))
+		b.WriteString("┘")
+		widthWritten = a.ColEnd + 1
+	}
+	return b.String()
 }

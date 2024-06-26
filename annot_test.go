@@ -2,6 +2,7 @@ package annot
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ func TestWrite(t *testing.T) {
 		name    string
 		annots  []*Annot
 		wantW   string
-		wantErr bool
+		wantErr error
 	}{
 		{
 			name: "utilise every space to the limit",
@@ -30,7 +31,6 @@ func TestWrite(t *testing.T) {
    5000000
    6000000000000
 `,
-			wantErr: false,
 		},
 		{
 			name: "empty annotation",
@@ -41,7 +41,6 @@ func TestWrite(t *testing.T) {
 ↑
 └─ 
 `,
-			wantErr: false,
 		},
 		{
 			name: "two empty annotations",
@@ -54,7 +53,6 @@ func TestWrite(t *testing.T) {
 │└─ 
 └─ 
 `,
-			wantErr: false,
 		},
 		{
 			name: "annotation without a column",
@@ -65,7 +63,6 @@ func TestWrite(t *testing.T) {
 ↑
 └─ line1
 `,
-			wantErr: false,
 		},
 		{
 			name: "annotation without a line",
@@ -76,7 +73,6 @@ func TestWrite(t *testing.T) {
 ↑
 └─ 
 `,
-			wantErr: false,
 		},
 		{
 			name: "annotation with one line",
@@ -87,7 +83,6 @@ func TestWrite(t *testing.T) {
  ↑
  └─ line1
 `,
-			wantErr: false,
 		},
 		{
 			name: "annotation with five lines",
@@ -102,7 +97,6 @@ func TestWrite(t *testing.T) {
    line4
    line5
 `,
-			wantErr: false,
 		},
 		{
 			name: "utf8, japanese characters and emojis",
@@ -115,7 +109,6 @@ func TestWrite(t *testing.T) {
 └─ ⭐️漢   └─ æñŶǼǊ
    æñ🥏Ǌ     字ñŶǼǊ
 `,
-			wantErr: false,
 		},
 		{
 			name: "next to each other with enough distance and second annotation has more lines",
@@ -130,7 +123,6 @@ func TestWrite(t *testing.T) {
                        line3
                        line4
 `,
-			wantErr: false,
 		},
 		{
 			name: "next to each other with enough distance and first annotation has more lines",
@@ -145,7 +137,6 @@ func TestWrite(t *testing.T) {
         line3
         line4
 `,
-			wantErr: false,
 		},
 		{
 			name: "annots are close",
@@ -161,7 +152,6 @@ func TestWrite(t *testing.T) {
 └─ line1
    line2
 `,
-			wantErr: false,
 		},
 		{
 			name: "annots have correct vertical distance",
@@ -181,7 +171,6 @@ func TestWrite(t *testing.T) {
      └─ line1
         line2
 `,
-			wantErr: false,
 		},
 		{
 			name: "first annotation is at the height of the pipes of the second annotation",
@@ -198,7 +187,6 @@ func TestWrite(t *testing.T) {
           └─ line1
              line2
 `,
-			wantErr: false,
 		},
 		{
 			name: "correct vertical and horizontal distance",
@@ -215,7 +203,6 @@ func TestWrite(t *testing.T) {
      └─ line1
         line2
 `,
-			wantErr: false,
 		},
 		{
 			name: "correct horizontal distance",
@@ -228,7 +215,6 @@ func TestWrite(t *testing.T) {
 └─ line1  └─ line1
    line2     line2
 `,
-			wantErr: false,
 		},
 		{
 			name: "allow one space more at the edge",
@@ -243,7 +229,6 @@ func TestWrite(t *testing.T) {
 └─ line1
    line2
 `,
-			wantErr: false,
 		},
 		{
 			name: "allow one space more at lines after the second line",
@@ -258,7 +243,6 @@ func TestWrite(t *testing.T) {
 └─ line1  line3
    line2  line4
 `,
-			wantErr: false,
 		},
 		{
 			name: "long line of first annotation uses available space",
@@ -274,7 +258,6 @@ func TestWrite(t *testing.T) {
      line2
      line3long
 `,
-			wantErr: false,
 		},
 		{
 			name: "last annotation shares row with first annotation",
@@ -288,7 +271,6 @@ func TestWrite(t *testing.T) {
 └─ line1  └─ line1  └─ line1
    line2               line2
 `,
-			wantErr: false,
 		},
 		{
 			name: "complex annotation arrangement",
@@ -311,7 +293,6 @@ func TestWrite(t *testing.T) {
    line7                              line2
    line8verylongverylongverylong      line3
 `,
-			wantErr: false,
 		},
 		{
 			name: "last annotation shares row with first annotation and first annotation uses available space",
@@ -328,7 +309,6 @@ func TestWrite(t *testing.T) {
    line2
    line3verylongverylong
 `,
-			wantErr: false,
 		},
 		{
 			name: "first annotation uses indentation space of second annotation",
@@ -342,7 +322,87 @@ func TestWrite(t *testing.T) {
 │          line2
 └─ line1   line3
 `,
-			wantErr: false,
+		},
+		{
+			name: "one ranged annotation",
+			annots: []*Annot{
+				{Col: 0, ColEnd: 2},
+			},
+			wantW: `
+└┬┘
+ └─ 
+`,
+		},
+		{
+			name: "one narrow ranged annotation",
+			annots: []*Annot{
+				{Col: 0, ColEnd: 1},
+			},
+			wantW: `
+├┘
+└─ 
+`,
+		},
+		{
+			name: "two ranged annotation",
+			annots: []*Annot{
+				{Col: 0, ColEnd: 2},
+				{Col: 6, ColEnd: 10},
+			},
+			wantW: `
+└┬┘   └─┬─┘
+ └─     └─ 
+`,
+		},
+		{
+			name: "mix ranged and arrowed annotation",
+			annots: []*Annot{
+				{Col: 0, ColEnd: 2},
+				{Col: 4},
+				{Col: 5},
+				{Col: 7, ColEnd: 11},
+				{Col: 13},
+				{Col: 14},
+			},
+			wantW: `
+└┬┘ ↑↑ └─┬─┘ ↑↑
+ │  ││   │   │└─ 
+ │  ││   │   └─ 
+ │  ││   └─ 
+ │  │└─ 
+ │  └─ 
+ └─ 
+`,
+		},
+		{
+			name: "overlapping annotation",
+			annots: []*Annot{
+				{Col: 0, ColEnd: 1},
+				{Col: 1, ColEnd: 2},
+			},
+			wantErr: &OverlapError{},
+		},
+		{
+			name: "col is equal to col end",
+			annots: []*Annot{
+				{Col: 1, ColEnd: 1},
+			},
+			wantErr: &ColExceedsColEndError{},
+		},
+		{
+			name: "col is higher than col end",
+			annots: []*Annot{
+				{Col: 2, ColEnd: 1},
+			},
+			wantErr: &ColExceedsColEndError{},
+		},
+		{
+			name: "col exceeds col end error occurs before overlapping error",
+			annots: []*Annot{
+				{Col: 1, ColEnd: 1},
+				{Col: 1, ColEnd: 2},
+			},
+			wantErr: &ColExceedsColEndError{},
 		},
 		{
 			name: "remove second annotation with same column position",
@@ -354,15 +414,16 @@ func TestWrite(t *testing.T) {
 ↑
 └─ line1
 `,
-			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
 			err := Write(w, tt.annots...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Write() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr != nil {
+				if !errors.Is(tt.wantErr, err) {
+					t.Errorf("Write() error = %v, wantErr %v", err, tt.wantErr)
+				}
 				return
 			}
 			if gotW := "\n" + w.String(); gotW != tt.wantW {

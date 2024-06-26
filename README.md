@@ -2,14 +2,17 @@
 
 # Annot
 
-Annotate a string line with arrows leading to a description.
+Annotate a string line leading to a description.
 
 ```
-The quick brown fox jumps over the lazy dog
-      ↑     ↑                       ↑
-      │     └─ adjective            └─ adjective
-      │
-      └─ adjective
+The greatest enemy of knowledge is not ignorance, it is the illusion of knowledge.
+ ↑  └──┬───┘          └───┬───┘                 ↑
+ │     └─ adjective       │                     └─ comma
+ │                        │
+ └─ article               └─ facts, information, and skills acquired
+                             through experience or education;
+                             the theoretical or practical understanding
+                             of a subject.
 ```
 
 ## Installation
@@ -30,11 +33,17 @@ import (
 )
 
 func main() {
-	fmt.Println("The quick brown fox jumps over the lazy dog")
+	fmt.Println("The greatest enemy of knowledge is not ignorance, it is the illusion of knowledge.")
 	fmt.Println(annot.String(
-		&annot.Annot{Col: 6, Lines: []string{"adjective"}},
-		&annot.Annot{Col: 12, Lines: []string{"adjective"}},
-		&annot.Annot{Col: 36, Lines: []string{"adjective"}},
+		&annot.Annot{Col: 1, Lines: []string{"article"}},
+		&annot.Annot{Col: 4, ColEnd: 11, Lines: []string{"adjective"}},
+		&annot.Annot{Col: 22, ColEnd: 30, Lines: []string{
+			"facts, information, and skills acquired",
+			"through experience or education;",
+			"the theoretical or practical understanding",
+			"of a subject.",
+		}},
+		&annot.Annot{Col: 48, Lines: []string{"comma"}},
 	))
 }
 ```
@@ -42,9 +51,12 @@ func main() {
 Output:
 
 ```
-The quick brown fox jumps over the lazy dog
-      ↑     ↑                       ↑
-      │     └─ adjective            └─ adjective
-      │
-      └─ adjective
+The greatest enemy of knowledge is not ignorance, it is the illusion of knowledge.
+ ↑  └──┬───┘          └───┬───┘                 ↑
+ │     └─ adjective       │                     └─ comma
+ │                        │
+ └─ article               └─ facts, information, and skills acquired
+                             through experience or education;
+                             the theoretical or practical understanding
+                             of a subject.
 ```
