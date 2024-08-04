@@ -233,7 +233,7 @@ func checkLineAndSetSpace(row, aLineIdx int, a *Annot, rightAnnots []*Annot) boo
 		leadingSpaces2 := closestA2.pipeColIdx + s2.colPosShift() - a.pipeColIdx - lineLength
 		if s2 == above {
 			closestA2.pipeLeadingSpaces[rowPlusLineIdx] = leadingSpaces2
-			break
+			return true
 		}
 		closestA2.lines[rowPlusLineIdx-closestA2.row].leadingSpaces = leadingSpaces2
 	default:
