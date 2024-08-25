@@ -22,6 +22,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Check dependencies tidiness
+        run: go mod tidy -diff
+
       - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:
